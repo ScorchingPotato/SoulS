@@ -1,0 +1,88 @@
+import pygame
+from utils import *
+from ui import *
+
+class Decor:
+    def __init__(self,game,type,pos):
+        self.img = load_image(f"assets/decor/{type}.png", 16)
+        self.pos = pos
+        self.game = game
+        self.collrect = None
+    def draw(self):
+        self.game.screen.blit(self.img, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
+
+class Tile(pygame.sprite.Sprite):
+    def __init__(self,name,pos,type="",rotation=0):
+        super().__init__()
+        self.name = name
+        self.type = type
+        self.prefix = "-" if type else ""
+        self.rect = pygame.Rect(*pos, 64, 64)
+
+        self.img = pygame.transform.rotate(load_image(f"assets/tiles/{name}{self.prefix}{type}.png", 64), rotation)
+    
+class Wrapper:
+    def __init__(self,game,pos,tiles,res):
+        self.game = game
+        self.pos = pos
+        self.tiles = tiles
+        self.surf = pygame.Surface(res, pygame.SRCALPHA)
+        self.rect = pygame.Rect(*pos,*res)
+        self.drawsurface()
+
+    def drawsurface(self):
+        for t in self.tiles:
+            self.surf.blit(t.img, (t.rect.x, t.rect.y))
+
+    def draw(self):
+        self.game.screen.blit(self.surf, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
+        if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
+
+
+class Lantern:
+    def __init__(self,game,pos):
+        self.img = load_image(f"assets/decor/lantern.png", 64)
+        self.rect = pygame.Rect(*pos, 64, 64)
+        self.collrect = pygame.Rect(pos[0]+16,pos[1]+48, 32, 16)
+        self.pos = pos
+        self.game = game
+        self.lighten = False
+        self.lightsprites = []
+        self.load_sprites()
+        self.i = 0
+        self.ylayer = pos[1]
+
+        self.lightradius = 192
+        self.l = self.lightradius//2
+        self.ib = Interact(self.game, (self.rect.x-32,self.rect.y-32), "key", "Light up")
+        self.game.uilayer.append(self.ib)
+
+    def load_sprites(self):
+        for i in range(4):
+            self.lightsprites.append(load_image(f"assets/light/{i}.png", 64))
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        self.ylayer = self.rect.y+self.game.offset[1]-8
+        if self.lighten: self.l+=1;self.l=min(self.l, self.lightradius)
+        if self.rect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.rect) and self.game.player.poe >= 1 and not self.lighten:
+            self.ib.visible = True
+            if keys[pygame.K_e]:
+                self.lighten = True
+                self.game.player.poe -= 1
+                self.game.uilayer.remove(self.ib)
+        else:
+            self.ib.visible = False
+
+        if self.collrect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.collrect):
+            self.game.player.canceldir = self.game.player.direction
+
+    def draw(self):
+        self.update()
+        self.game.screen.blit(self.img, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
+        if self.lighten:
+            r = self.rect.move(self.game.offset[0],self.game.offset[1])
+            pygame.draw.circle(self.game.lightmask, (0, 0, 0, 0), (r.x+32,r.y+32), self.l*2)
+            self.game.screen.blit(self.lightsprites[int(self.i*self.game.animspeed)%4], (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
+        if self.game.debugrect: pygame.draw.rect(self.game.screen,(0,0,255),self.collrect.move(self.game.offset[0],self.game.offset[1]),1)
+        self.i += 1
