@@ -13,6 +13,6 @@ def construct(map,game,pos):
             if t[0] == "p": #path tile
                 tiles.append(Tile("path",(x*64,y*64),t[1],int(t[2])*90))
             if t[0] == "@":
-                tiles.append(Tile("@",(x*64,y*64)))
+                tiles.append(Tile("@",(x*64,y*64),collrect=pygame.Rect(x*64,y*64,64,64)))
 
     return Wrapper(game,pos,tiles,(len(map[0])*64,len(map)*64))

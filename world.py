@@ -12,12 +12,13 @@ class Decor:
         self.game.screen.blit(self.img, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
 
 class Tile(pygame.sprite.Sprite):
-    def __init__(self,name,pos,type="",rotation=0):
+    def __init__(self,name,pos,type="",rotation=0,collrect=pygame.Rect(0,0,0,0)):
         super().__init__()
         self.name = name
         self.type = type
         self.prefix = "-" if type else ""
         self.rect = pygame.Rect(*pos, 64, 64)
+        self.collrect = collrect
 
         self.img = pygame.transform.rotate(load_image(f"assets/tiles/{name}{self.prefix}{type}.png", 64), rotation)
     
@@ -28,15 +29,30 @@ class Wrapper:
         self.tiles = tiles
         self.surf = pygame.Surface(res, pygame.SRCALPHA)
         self.rect = pygame.Rect(*pos,*res)
+        self.debugsurf = pygame.Surface(res, pygame.SRCALPHA)
+        self.trects = []
         self.drawsurface()
 
     def drawsurface(self):
         for t in self.tiles:
             self.surf.blit(t.img, (t.rect.x, t.rect.y))
+            self.trects.append(t.collrect)
+            #pygame.draw.rect(self.debugsurf,(255,255,0),t.rect,1)
+        self.trects = compress_rects(self.trects)
+        for r in self.trects:
+            pygame.draw.rect(self.debugsurf,(255,255,255),r,1)
+
+    def update(self):
+        for r in self.trects:
+            if r.move(self.game.offset[0]+self.pos[0],self.game.offset[1]+self.pos[1]).colliderect(self.game.player.collrect):
+                self.game.player.canceldir = self.game.player.direction
 
     def draw(self):
+        self.update()
         self.game.screen.blit(self.surf, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
-        if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
+        if self.game.debugrect: 
+            pygame.draw.rect(self.game.screen,(255,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
+            self.game.screen.blit(self.debugsurf, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
 
 
 class Lantern:
