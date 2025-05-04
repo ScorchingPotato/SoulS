@@ -118,3 +118,127 @@ def load_image(path,res):
         return pygame.transform.scale(pygame.image.load(path),r)
     except FileNotFoundError:
         return pygame.transform.scale(pygame.image.load("assets/error.png"),r)
+    
+import heapq
+
+class Node:
+    def __init__(self, position, g, h, parent=None):
+        self.position = position  # (x, y)
+        self.g = g  # Cost from start to current node
+        self.h = h  # Heuristic cost to goal
+        self.f = g + h  # Total cost
+        self.parent = parent
+
+    def __lt__(self, other):
+        return self.f < other.f
+
+def heuristic(a, b):
+    # Manhattan distance
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
+
+def pathfind(start, goal, obstacles=[]):
+    """
+    A* pathfinding algorithm to find the shortest path from start to goal.
+
+    Args:
+        start (tuple): Starting position (x, y).
+        goal (tuple): Goal position (x, y).
+        obstacles (list): List of pygame.Rect objects representing obstacles.
+
+    Returns:
+        list: A simplified list of (x, y) tuples representing the path.
+    """
+    open_list = []
+    heapq.heappush(open_list, Node(start, g=0, h=heuristic(start, goal)))
+    closed_set = set()
+    came_from = {}
+
+    g_score = {start: 0}
+    f_score = {start: heuristic(start, goal)}
+
+    while open_list:
+        current = heapq.heappop(open_list).position
+
+        if current == goal:
+            path = reconstruct_path(came_from, current)
+            return simplify_path(path)
+
+        closed_set.add(current)
+
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (1, -1), (-1, 1)]:
+            neighbor = (current[0] + dx, current[1] + dy)
+
+            if neighbor in closed_set or not valid(neighbor, obstacles):
+                continue
+
+            tentative_g_score = g_score[current] + 1
+
+            if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
+                came_from[neighbor] = current
+                g_score[neighbor] = tentative_g_score
+                f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
+                heapq.heappush(open_list, Node(neighbor, g=g_score[neighbor], h=heuristic(neighbor, goal)))
+
+    return None  # No path found
+
+
+def reconstruct_path(came_from, current):
+    """
+    Reconstruct the path from the came_from map.
+
+    Args:
+        came_from (dict): Map of nodes to their predecessors.
+        current (tuple): Current position.
+
+    Returns:
+        list: A list of (x, y) tuples representing the path.
+    """
+    path = [current]
+    while current in came_from:
+        current = came_from[current]
+        path.append(current)
+    path.reverse()
+    return path
+
+
+def simplify_path(path):
+    """
+    Simplify the path by removing intermediate points on the same straight line
+    and converting it into direction tuples.
+
+    Args:
+        path (list): A list of (x, y) tuples representing the path.
+
+    Returns:
+        list: A simplified list of direction tuples (dx, dy).
+    """
+    if len(path) <= 1:
+        return []
+
+    directions = []
+    for i in range(1, len(path)):
+        dx = path[i][0] - path[i - 1][0]
+        dy = path[i][1] - path[i - 1][1]
+        direction = (dx // max(1, abs(dx)), dy // max(1, abs(dy)))  # Normalize to unit direction
+        directions.append(direction)
+
+    return directions
+
+
+def valid(pos, obstacles):
+    """
+    Check if a position is valid (not colliding with any obstacles).
+
+    Args:
+        pos (tuple): Position to check (x, y).
+        obstacles (list): List of pygame.Rect objects representing obstacles.
+
+    Returns:
+        bool: True if the position is valid, False otherwise.
+    """
+    point_rect = pygame.Rect(pos[0], pos[1], 1, 1)
+    return not any(point_rect.colliderect(obstacle) for obstacle in obstacles)
+
+
+
+

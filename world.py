@@ -42,7 +42,13 @@ class Wrapper:
         for r in self.trects:
             pygame.draw.rect(self.debugsurf,(255,255,255),r,1)
 
+    def update(self):
+        for r in self.trects:
+            if r.move(self.game.offset[0]+self.pos[0],self.game.offset[1]+self.pos[1]).colliderect(self.game.player.collrect):
+                self.game.player.canceldir = self.game.player.direction
+
     def draw(self):
+        self.update()
         self.game.screen.blit(self.surf, (self.pos[0]+self.game.offset[0], self.pos[1]+self.game.offset[1]))
         if self.game.debugrect: 
             pygame.draw.rect(self.game.screen,(255,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)

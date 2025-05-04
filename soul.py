@@ -42,6 +42,7 @@ class Player(pygame.sprite.Sprite):
 
         if self.hit:
             self.hitd += 1
+            self.i=0
             if self.hitd >= 30:
                 self.hit = False
                 self.hitd = 0
@@ -81,7 +82,11 @@ class Player(pygame.sprite.Sprite):
 
     def draw(self):
         self.update()
-        self.game.screen.blit(self.sprites[int(self.poe>0)][int(self.i*self.game.animspeed)%9], self.rect.topleft)
+        s = self.sprites[int(self.poe>0)][int(self.i*self.game.animspeed)%9]
+        if self.hit and self.hitd<=10:
+            s = s.copy()
+            s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
+        self.game.screen.blit(s, self.rect.topleft)
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect,1);pygame.draw.rect(self.game.screen,(0,0,255),self.collrect,1)
         pygame.draw.circle(self.game.lightmask, (0, 0, 0, 0), (self.rect.x+32,self.rect.y+32), self.lightradius*2)
         self.i += 1
@@ -110,6 +115,9 @@ class Flame:
             if isinstance(obj, Anger) and obj.collrect.colliderect(self.rect):
                 self.lifetime = self.lifemax
                 obj.hp -= 0.5
+                obj.hit = True
+                obj.rect.x += self.direction.x * self.speed
+                obj.rect.y += self.direction.y * self.speed
 
 
         self.lifetime += 1
@@ -174,7 +182,8 @@ class Anger(pygame.sprite.Sprite):
         self.load_sprites()
         self.i = 0 #Frame index
         self.speed = 1
-        self.avoid = False
+        self.hit = False
+        self.hitd = 0
         self.agro = 300
 
         self.hp = 1
@@ -198,68 +207,72 @@ class Anger(pygame.sprite.Sprite):
     def update(self):
         if self.hp <= 0:
             self.die()
-        self.avoid = False
+        if self.hit:
+            self.hitd += 1
+            self.i=0
+            if self.hitd >= 30:
+                self.hit = False
+                self.hitd = 0
         self.ylayer = self.rect.y + self.game.offset[1]
+        r = self.rect.move(self.game.offset[0],self.game.offset[1])
+        targetd = pygame.math.Vector2(self.game.player.rect.x-r.x,self.game.player.rect.y-r.y)
+        if targetd.magnitude() > 0:
+            ntg = targetd.normalize()
+        if not self.leep:
+            self.direction = pygame.math.Vector2(0, 0)
 
-        # Calculate direction toward the player
-        r = self.rect.move(self.game.offset[0], self.game.offset[1])
-        target_direction = pygame.Vector2(
-            self.game.player.rect.centerx - r.centerx,
-            self.game.player.rect.centery - r.centery
-        )
-
-        # Avoid obstacles (Lanterns)
-        for obj in self.game.frontlayer:
-            if isinstance(obj, Lantern) and obj.collrect.colliderect(self.collrect):
-                # Calculate avoidance vector
-                avoidance = pygame.Vector2(
-                    self.collrect.centerx - obj.collrect.centerx,
-                    self.collrect.centery - obj.collrect.centery
-                )
-                if avoidance.magnitude() > 0:
-                    avoidance = avoidance.normalize() * 100  # Scale avoidance force
-                    target_direction += avoidance
-                    self.avoid = True
-
-
-        if self.leep:
-            self.rect.x += self.d.x*self.lspd
-            self.rect.y += self.d.y*self.lspd
-            self.collrect.topleft = (self.rect.x+8,self.rect.y+34)
-            if self.collrect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.collrect) and not self.game.player.hit:
-                self.game.player.poe -= 0.5
-                self.game.player.hit = True
-
-        if target_direction.magnitude() < 100 and not self.avoid:
-            self.leepw += 1
-        else:
-            self.speed = 1
-            if not self.leep:
-                self.leepw = 0
+        if targetd.magnitude() <= self.agro:
+            objects = []
+            for w in self.game.backlayer:
+                for r in w.trects:
+                    objects.append(r.move(self.game.offset[0]+w.pos[0],self.game.offset[1]+w.pos[1]))
+            for obj in self.game.frontlayer:
+                if isinstance(obj, Lantern):
+                    objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
+            self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
+            if not self.path: self.path = [(0,0)]
 
         
-        if self.leept == 1:
-            self.d = target_direction.normalize()
+        if targetd.magnitude() <= 150 and not self.leep and abs(self.path[0][0]-ntg.x)<=0.3 and abs(self.path[0][1]-ntg.y)<=0.3:
+            self.leepw += 1
+        
+        elif targetd.magnitude() <= self.agro and not self.leep:
+            self.direction = pygame.Vector2(self.path[0][0], self.path[0][1])
 
         if self.leepw >= 30:
             self.leep = True
             self.leept += 1
         if self.leept == self.leeptime:
-            self.leepw=0
-            self.leept=0
+            self.leepw = 0
+            self.leept = 0
             self.leep = False
 
+        if self.leept == 1:
+            self.d = ntg
+
+        if self.leept > 0:
+            self.direction = self.d*self.lspd*(15/self.leept)
+
         # Normalize and apply movement
-        if target_direction.magnitude() > 0 and self.leepw == 0 and target_direction.magnitude() < self.agro:
-            self.direction = target_direction.normalize()
+        if self.direction.magnitude() > 0:
             self.rect.x += self.direction.x * self.speed
             self.rect.y += self.direction.y * self.speed
             self.collrect.topleft = (self.rect.x+8,self.rect.y+34)  # Update collrect position
 
+        if self.leep and self.collrect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.collrect) and not self.game.player.hit:
+            self.game.player.poe -= 0.5
+            self.game.player.hit = True
+            self.game.offset[0] -= self.direction.x
+            self.game.offset[1] -= self.direction.y
+
 
     def draw(self):
         self.update()
-        self.game.screen.blit(self.sprites[int(self.i*self.game.animspeed)%9], (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
+        s=self.sprites[int(self.i*self.game.animspeed)%9]
+        if self.hit and self.hitd<=10:
+            s = s.copy()
+            s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
+        self.game.screen.blit(s, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
         if self.game.debugrect: 
             pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
             pygame.draw.rect(self.game.screen,(0,0,255),self.collrect.move(self.game.offset[0],self.game.offset[1]),1)
