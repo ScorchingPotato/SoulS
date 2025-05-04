@@ -84,6 +84,7 @@ class Lantern:
         if self.rect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.rect) and self.game.player.poe >= 1 and not self.lighten:
             self.ib.visible = True
             if keys[pygame.K_e]:
+                pygame.mixer.Sound("assets/sound/light_lantern.mp3").play()
                 self.lighten = True
                 self.game.player.poe -= 1
                 self.game.uilayer.remove(self.ib)

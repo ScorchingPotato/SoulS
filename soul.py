@@ -43,6 +43,7 @@ class Player(pygame.sprite.Sprite):
         if self.hit:
             self.hitd += 1
             self.i=0
+            if self.hitd == 1: pygame.mixer.Sound("assets/sound/hit.mp3").play()
             if self.hitd >= 30:
                 self.hit = False
                 self.hitd = 0
@@ -107,6 +108,8 @@ class Flame:
 
         self.angle = math.degrees(math.atan2(-self.direction.y, self.direction.x))+90
 
+        pygame.mixer.Sound("assets/sound/flame.mp3").play()
+
     def update(self):
         for obj in self.game.frontlayer:
             if isinstance(obj, Lantern) and obj.collrect.colliderect(self.rect):
@@ -163,6 +166,7 @@ class Poe(pygame.sprite.Sprite):
         if self.rect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.rect):
             self.game.player.poe += 1
             self.game.frontlayer.remove(self)
+            pygame.mixer.Sound("assets/sound/collect_poe.mp3").play()
 
     def draw(self):
         self.update()
@@ -210,6 +214,7 @@ class Anger(pygame.sprite.Sprite):
         if self.hit:
             self.hitd += 1
             self.i=0
+            if self.hitd == 1: pygame.mixer.Sound("assets/sound/hit.mp3").play()
             if self.hitd >= 30:
                 self.hit = False
                 self.hitd = 0
@@ -249,6 +254,7 @@ class Anger(pygame.sprite.Sprite):
 
         if self.leept == 1:
             self.d = ntg
+            pygame.mixer.Sound("assets/sound/fire_dash.mp3").play()
 
         if self.leept > 0:
             self.direction = self.d*self.lspd*(15/self.leept)

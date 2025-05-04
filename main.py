@@ -35,6 +35,10 @@ class Game:
 
         self.rungame = True
 
+        pygame.mixer.music.load("assets/sound/main_soundtrack.mp3")
+        pygame.mixer.music.set_volume(0.25)
+        pygame.mixer.music.play(-1)
+
     def run(self):
         while self.rungame:
             self.clock.tick(60)
