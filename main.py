@@ -17,15 +17,17 @@ class Game:
 
 
         #DEBUG
-        self.debugrect = True
-        self.debugdark = True
+        self.debugrect = not True
+        self.debugdark = not True
 
         self.offset = [0,0]
         self.animspeed = 0.2
 
+        self.stop = False
 
+        #Dialogue dim = (768,122)
 
-        self.uilayer = []
+        self.uilayer = [DialogueBox(self,[Dialogue(f"&Hello %*world!",(768,122))])]
         self.projlayer = []
         self.player = Player(self, (568, 368))
 
@@ -57,6 +59,8 @@ class Game:
                         if event.key == pygame.K_KP_PLUS:
                             self.player.poe += 1
 
+            if not self.stop:
+                self.update()
             self.draw()
             self.display()
 
@@ -75,6 +79,11 @@ class Game:
         for s in self.projlayer:s.draw()
 
         for s in self.uilayer:s.draw()
+
+    def update(self):
+        for s in self.frontlayer:s.update()
+
+        for s in self.projlayer:s.update()
 
     def display(self):
         a = (255,0,0,15) if self.debugdark else (0,0,0)

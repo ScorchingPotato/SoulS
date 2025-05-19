@@ -81,15 +81,17 @@ class Player(pygame.sprite.Sprite):
             self.sprites.append(a)
             a = []
 
+    def drawlight(self):
+        pygame.draw.circle(self.game.lightmask, (0, 0, 0, 0), (self.rect.x+32,self.rect.y+32), self.lightradius*2)
+
     def draw(self):
-        self.update()
         s = self.sprites[int(self.poe>0)][int(self.i*self.game.animspeed)%9]
         if self.hit and self.hitd<=10:
             s = s.copy()
             s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
         self.game.screen.blit(s, self.rect.topleft)
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect,1);pygame.draw.rect(self.game.screen,(0,0,255),self.collrect,1)
-        pygame.draw.circle(self.game.lightmask, (0, 0, 0, 0), (self.rect.x+32,self.rect.y+32), self.lightradius*2)
+        self.drawlight()
         self.i += 1
 
 class Flame:
@@ -134,7 +136,6 @@ class Flame:
         
 
     def draw(self):
-        self.update()
         image = pygame.transform.rotate(self.sprites[int(self.i * self.game.animspeed) % 4], self.angle)
         self.game.screen.blit(image, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
@@ -188,7 +189,6 @@ class Heart:
         
 
     def draw(self):
-        self.update()
         image = self.sprites[int(self.i * self.game.animspeed) % 4]
         self.game.screen.blit(image, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
@@ -216,7 +216,6 @@ class Poe(pygame.sprite.Sprite):
             pygame.mixer.Sound("assets/sound/collect_poe.mp3").play()
 
     def draw(self):
-        self.update()
         self.game.screen.blit(self.sprites[int(self.i*self.game.animspeed)%6], (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
         self.i += 1
@@ -320,7 +319,6 @@ class Anger(pygame.sprite.Sprite):
 
 
     def draw(self):
-        self.update()
         s=self.sprites[int(self.i*self.game.animspeed)%9]
         if self.hit and self.hitd<=10:
             s = s.copy()
@@ -415,7 +413,6 @@ class Lust(pygame.sprite.Sprite):
 
 
     def draw(self):
-        self.update()
         s=self.sprites[int(self.i*self.game.animspeed)%9]
         if self.hit and self.hitd<=10:
             s = s.copy()

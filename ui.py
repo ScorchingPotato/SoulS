@@ -1,6 +1,143 @@
 import pygame,math
 from utils import *
 
+pygame.init()
+pygame.font.init()
+
+class TextBlock:
+    def __init__(self,text,x,y,flag=[],fontsize=24):
+        self.text = text
+        self.x = x
+        self.y = y
+        self.flag = flag
+        self.font = pygame.font.Font("assets/font.ttf", fontsize)
+        if 'b' in flag:self.font.set_bold(True)
+        if 'i' in flag:self.font.set_italic(True)
+        if 'u' in flag:self.font.set_underline(True)
+        if 'h' in flag:c=(255, 0, 0) 
+        else: c=(255, 255, 255)
+        self.surf = self.font.render(self.text, True, c)
+
+    def blit(self,screen):
+        screen.blit(self.surf, (self.x, self.y))
+
+    def __repr__(self):
+        return f"TextBlock(text={self.text}, x={self.x}, y={self.y}, flag={self.flag})"
+
+class Dialogue:
+    def __init__(self, text, dimensions, fontsize=24):
+        self.fontsize = fontsize
+        self.text = text
+        self.dimensions = dimensions
+        self.dimx = dimensions[0]
+        self.dimy = dimensions[1]
+        self.font = pygame.font.Font("assets/font.ttf", fontsize)
+        self.textsurface = pygame.Surface(self.dimensions, pygame.SRCALPHA)
+        self.rendered_text = []  # Stores the progressively rendered TextBlocks
+        self.current_index = 0  # Tracks the current letter being rendered
+        self.frame_counter = 0  # Frame counter for controlling the scribble speed
+        self.scribble_speed = 20  # Frames per letter
+        self.text_blocks = self.format_text()  # Preprocess the text into TextBlocks
+
+    def format_text(self):
+        words = self.text.split(" ")
+        text = []
+        cx, cy = 0, 0
+
+        for word in words:
+            f = []
+            if word.startswith("&"):
+                f.append("b")
+                word = word[1:]
+            if word.startswith("%"):
+                f.append("i")
+                word = word[1:]
+            if word.startswith("_"):
+                f.append("u")
+                word = word[1:]
+            if word.startswith("*"):
+                f.append("h")
+                word = word[1:]
+
+            # Create a temporary font object to calculate the word width with flags
+            temp_font = pygame.font.Font("assets/font.ttf", self.fontsize)
+            if 'b' in f:
+                temp_font.set_bold(True)
+            if 'i' in f:
+                temp_font.set_italic(True)
+            if 'u' in f:
+                temp_font.set_underline(True)
+
+            word_width = temp_font.size(word + " ")[0]
+
+            # Check if adding the word exceeds the line width
+            if cx + word_width > self.dimx:
+                # Move to the next line
+                cx = 0
+                cy += self.fontsize
+
+            # Create a TextBlock for the word
+            text.append(TextBlock(word, cx, cy, f, self.fontsize))
+            cx += word_width  # Update the x position for the next word
+
+        return text
+
+    def update(self):
+        self.frame_counter += 1
+        if self.frame_counter >= self.scribble_speed and self.current_index < len(self.text_blocks):
+            self.rendered_text.append(self.text_blocks[self.current_index])
+            self.current_index += 1
+            self.frame_counter = 0  # Reset the frame counter
+        if self.current_index >= len(self.text_blocks):
+            return True  # All text has been rendered
+        return False  # Still rendering text
+
+    def render(self):
+        self.textsurface.fill((0, 0, 0, 0))  # Clear the surface
+        for block in self.rendered_text:
+            block.blit(self.textsurface)
+        return self.textsurface
+
+    def draw(self, surf):
+        surf.blit(self.render(), (32, 48))
+
+class DialogueBox:
+    def __init__(self,game,dialogues):
+        self.game = game
+        self.dialogues = dialogues
+        self.dialogue = dialogues[0]
+        self.current = 0
+        
+        self.drawbox()
+        self.visible = True
+
+    def drawbox(self):
+        self.box = pygame.Surface((832,192), pygame.SRCALPHA)
+        self.box.blit(load_image("assets/ui/dialogbox_corner.png",192), (0, 0))
+        self.box.blit(load_image("assets/ui/dialogbox_body.png",(448,192)), (192, 0))
+        self.box.blit(pygame.transform.flip(load_image("assets/ui/dialogbox_corner.png",192),True,False), (624, 0))
+
+
+    def draw(self):
+        if self.visible:
+            self.game.stop = True
+            if self.dialogue.update():
+                self.next()
+            self.dialogue.draw(self.box)
+            self.game.window.blit(self.box, (200, 608))
+
+    def next(self):
+        keys = pygame.key.get_pressed()
+        if True in keys:
+            self.current += 1
+            if self.current >= len(self.dialogues):
+                self.game.uilayer.remove(self)
+                self.game.stop = False
+            else:
+                self.dialogue = self.dialogues[self.current]
+                self.drawbox()
+            
+
 class Interact(pygame.sprite.Sprite):
     def __init__(self,game,pos,icon,text):
         super().__init__()
