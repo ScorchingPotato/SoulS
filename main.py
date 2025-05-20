@@ -17,8 +17,8 @@ class Game:
 
 
         #DEBUG
-        self.debugrect = not True
-        self.debugdark = not True
+        self.debugrect = True
+        self.debugdark = True
 
         self.offset = [0,0]
         self.animspeed = 0.2
@@ -27,7 +27,7 @@ class Game:
 
         #Dialogue dim = (768,122)
 
-        self.uilayer = [DialogueBox(self,[Dialogue(f"&Hello %*world!",(768,122))])]
+        self.uilayer = [DialogueBox(self,[Dialogue(f"Hello this is a test of the dialog system.",(768,122))])]
         self.projlayer = []
         self.player = Player(self, (568, 368))
 

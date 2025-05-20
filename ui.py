@@ -10,13 +10,22 @@ class TextBlock:
         self.x = x
         self.y = y
         self.flag = flag
+        self.len = len(text)
+        self.i = -1
         self.font = pygame.font.Font("assets/font.ttf", fontsize)
         if 'b' in flag:self.font.set_bold(True)
         if 'i' in flag:self.font.set_italic(True)
         if 'u' in flag:self.font.set_underline(True)
-        if 'h' in flag:c=(255, 0, 0) 
-        else: c=(255, 255, 255)
-        self.surf = self.font.render(self.text, True, c)
+        if 'h' in flag:self.c=(110,90,130) 
+        else: self.c=(20,10,40)
+        self.render()
+    def render(self):
+        if self.i >= self.len: return True
+        self.i += 1
+        t = self.text[:self.i]
+        self.surf = self.font.render(t, True, self.c)
+        return False
+
 
     def blit(self,screen):
         screen.blit(self.surf, (self.x, self.y))
@@ -36,7 +45,7 @@ class Dialogue:
         self.rendered_text = []  # Stores the progressively rendered TextBlocks
         self.current_index = 0  # Tracks the current letter being rendered
         self.frame_counter = 0  # Frame counter for controlling the scribble speed
-        self.scribble_speed = 20  # Frames per letter
+        self.scribble_speed = 10  # Frames per letter
         self.text_blocks = self.format_text()  # Preprocess the text into TextBlocks
 
     def format_text(self):
@@ -84,6 +93,16 @@ class Dialogue:
 
     def update(self):
         self.frame_counter += 1
+        if self.current_index < len(self.text_blocks):
+            if self.frame_counter >= self.scribble_speed:
+                self.frame_counter = 0
+                if self.text_blocks[self.current_index].render():
+                    self.current_index += 1
+            return False
+        return True
+
+  # Still rendering text
+        self.frame_counter += 1
         if self.frame_counter >= self.scribble_speed and self.current_index < len(self.text_blocks):
             self.rendered_text.append(self.text_blocks[self.current_index])
             self.current_index += 1
@@ -94,7 +113,7 @@ class Dialogue:
 
     def render(self):
         self.textsurface.fill((0, 0, 0, 0))  # Clear the surface
-        for block in self.rendered_text:
+        for block in self.text_blocks:
             block.blit(self.textsurface)
         return self.textsurface
 
