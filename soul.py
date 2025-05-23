@@ -280,6 +280,8 @@ class Anger(pygame.sprite.Sprite):
             for obj in self.game.frontlayer:
                 if isinstance(obj, Lantern):
                     objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
+                if isinstance(obj, Pillar):
+                    objects.append(obj.collrect.move(self.game.offset[0],self.game.offset[1]))
             self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
             if not self.path: self.path = [(0,0)]
 
@@ -387,6 +389,8 @@ class Lust(pygame.sprite.Sprite):
             for obj in self.game.frontlayer:
                 if isinstance(obj, Lantern):
                     objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
+                if isinstance(obj, Pillar):
+                    objects.append(obj.collrect.move(self.game.offset[0],self.game.offset[1]))
             self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
             if not self.path: self.path = [(0,0)]
 
