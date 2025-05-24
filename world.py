@@ -79,7 +79,7 @@ class Pillar:
 
     def cast_shadow(self, light_source, multiplier=1500):
         """Cast a shadow based on the light source."""
-        light_pos = pygame.math.Vector2(light_source.rect.center)
+        light_pos = pygame.math.Vector2(light_source)
         pillar_pos = pygame.math.Vector2(self.collrect.center)
         pillar_pos += pygame.math.Vector2(*self.game.offset)
 
@@ -96,12 +96,9 @@ class Pillar:
         # Calculate shadow length
         shadow_length = (1 / math.sqrt(distance)) * multiplier
 
-        # Calculate shadow endpoint
-        shadow_end = pillar_pos + direction * shadow_length
-
         # Create a shadow mask from the pillar's sprite
         s = self.img.copy()
-        s.fill((0, 0, 0, 200), special_flags=pygame.BLEND_RGBA_MULT)  # Darken the shadow mask
+        s.fill((0, 0, 0, min(1020/math.sqrt(distance),255)), special_flags=pygame.BLEND_RGBA_MULT)  # Darken the shadow mask
         s = pygame.transform.scale(s, (64+(distance/multiplier),shadow_length))
         angle = math.degrees(math.atan2(direction.y, -direction.x)) + 90
         s = pygame.transform.rotate(s, angle)  # Rotate the shadow mask
@@ -113,7 +110,11 @@ class Pillar:
         self.game.screen.blit(s, shadow_rect.topleft)
 
     def update(self):
-        self.cast_shadow(self.game.player)
+        for obj in self.game.frontlayer:
+            if isinstance(obj, Lantern) and obj.lighten:
+                self.cast_shadow(obj.collrect.move(self.game.offset[0],self.game.offset[1]).center, multiplier=2000)
+        if self.game.player.poe > 0:
+            self.cast_shadow(self.game.player.rect.center)
         self.ylayer = self.rect.y + self.game.offset[1] - 8 + (self.size - 1) * 64
         if self.collrect.move(self.game.offset[0], self.game.offset[1]).colliderect(self.game.player.collrect):
             self.game.player.canceldir = self.game.player.direction
