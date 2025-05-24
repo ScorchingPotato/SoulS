@@ -94,36 +94,26 @@ class Player(pygame.sprite.Sprite):
         self.drawlight()
         self.i += 1
 
-class Flame:
-    def __init__(self,game,pos,speed,direction):
+
+class Projectile(pygame.sprite.Sprite):
+    def __init__(self,game,pos,speed,direction,targets=(),objects=()):
+        super().__init__()
         self.game = game
         self.pos = pos
         self.speed = speed
         self.direction = direction
-        self.load_sprites()
         self.rect = pygame.Rect(*pos, 32, 32)
         self.i = 0
+        self.angle = 0
         self.lifetime = 0
         self.lifemax = 60
         self.game.projlayer.append(self)
-        self.lightradius = 16
-
-        self.angle = math.degrees(math.atan2(-self.direction.y, self.direction.x))+90
-
-        pygame.mixer.Sound("assets/sound/flame.mp3").play()
+        self.lightradius = 0
+        self.targets = targets
+        self.objects = objects
 
     def update(self):
-        for obj in self.game.frontlayer:
-            if isinstance(obj, Lantern) and obj.collrect.colliderect(self.rect):
-                self.lifetime = self.lifemax
-
-            if type(obj) in [Anger,Lust] and obj.collrect.colliderect(self.rect):
-                self.lifetime = self.lifemax
-                obj.hp -= 0.5
-                obj.hit = True
-                obj.rect.x += self.direction.x * self.speed
-                obj.rect.y += self.direction.y * self.speed
-
+        self.hit()
 
         self.lifetime += 1
         if self.lifetime >= self.lifemax:
@@ -133,66 +123,59 @@ class Flame:
             self.rect.x += self.direction.x * self.speed
             self.rect.y += self.direction.y * self.speed
 
-        
+    def hit(self,):
+        for obj in self.game.frontlayer:
+            if isinstance(obj, self.objects) and obj.collrect.colliderect(self.rect):
+                self.lifetime = self.lifemax
+
+            if isinstance(obj,self.targets) and obj.collrect.colliderect(self.rect.move(self.game.offset[0],self.game.offset[1])):
+                self.lifetime = self.lifemax
+                obj.poe -= 0.5
+                obj.hit = True
+                obj.rect.move_ip(self.direction*self.speed)
+                obj.collrect.move_ip(self.direction*self.speed)
 
     def draw(self):
         image = pygame.transform.rotate(self.sprites[int(self.i * self.game.animspeed) % 4], self.angle)
         self.game.screen.blit(image, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
         r = self.rect.move(self.game.offset[0],self.game.offset[1])
-        pygame.draw.circle(self.game.lightmask, (0, 0, 0, 0), (r.x+16,r.y+16), self.lightradius*2)
+        pygame.draw.circle(self.game.lightmask, (0, 0, 0, 0), r.center, self.lightradius*2)
         self.i += 1
 
-    def load_sprites(self):
+    def load_sprites(self,name=""):
         self.sprites = []
         for i in range(4):
-            self.sprites.append(load_image(f"assets/flame/{i}.png", 32))
+            self.sprites.append(load_image(f"assets/{name}/{i}.png", 32))
 
-class Heart:
+class Flame(Projectile):
     def __init__(self,game,pos,speed,direction):
-        self.game = game
-        self.pos = pos
-        self.speed = speed
-        self.direction = direction
-        self.load_sprites()
-        self.rect = pygame.Rect(*pos, 32, 32)
-        self.i = 0
-        self.lifetime = 0
-        self.lifemax = 60
-        self.game.projlayer.append(self)
+        super().__init__(game,pos,speed,direction,targets=Enemy,objects=(Lantern,Pillar))
+        self.load_sprites("flame")
+        self.lightradius = 16
+        self.angle = math.degrees(math.atan2(-self.direction.y, self.direction.x))+90
 
-        pygame.mixer.Sound("assets/sound/sore.mp3").play()
+        pygame.mixer.Sound("assets/sound/flame.mp3").play()
 
-    def update(self):
+    def hit(self):
         for obj in self.game.frontlayer:
             if isinstance(obj, Lantern) and obj.collrect.colliderect(self.rect):
                 self.lifetime = self.lifemax
-
-            if type(obj) is Player and obj.collrect.colliderect(self.rect.move(self.game.offset[0],self.game.offset[1])):
+                obj.lighten = True
+                obj.lightradius = 192
+                obj.l = 192
+            if isinstance(obj,self.targets) and obj.collrect.colliderect(self.rect):
                 self.lifetime = self.lifemax
-                obj.poe -= 0.5
+                obj.hp -= 0.5
                 obj.hit = True
 
+class Heart(Projectile):
+    def __init__(self,game,pos,speed,direction):
+        super().__init__(game,pos,speed,direction,targets=Player,objects=Lantern)
+        self.load_sprites("heart")
+        self.lightradius = 0
 
-        self.lifetime += 1
-        if self.lifetime >= self.lifemax:
-            self.game.projlayer.remove(self)
-            del self
-        else:
-            self.rect.x += self.direction.x * self.speed
-            self.rect.y += self.direction.y * self.speed
-
-    def load_sprites(self):
-        self.sprites = []
-        for i in range(4):
-            self.sprites.append(load_image(f"assets/heart/{i}.png", 32))
-        
-
-    def draw(self):
-        image = self.sprites[int(self.i * self.game.animspeed) % 4]
-        self.game.screen.blit(image, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
-        if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
-        self.i += 1
+        pygame.mixer.Sound("assets/sound/sore.mp3").play()
 
 class Poe(pygame.sprite.Sprite):
     def __init__(self,game,pos):
@@ -221,38 +204,66 @@ class Poe(pygame.sprite.Sprite):
         self.i += 1
 
 
-class Anger(pygame.sprite.Sprite):
-    def __init__(self,game,pos):
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self,game,pos,hp,speed,agro,attackrange,attackd):
         super().__init__()
         self.game = game
         self.rect = pygame.Rect(*pos, 64, 64)
         self.collrect = pygame.Rect(pos[0]+8,pos[1]+34, 48, 32)
         self.direction = pygame.math.Vector2(0, 0)
         self.ylayer = pos[1]
-        self.load_sprites()
         self.i = 0 #Frame index
-        self.speed = 1
+        self.speed = speed
         self.hit = False
         self.hitd = 0
-        self.agro = 300
+        self.agro = agro
+        self.hp = hp
 
-        self.hp = 1
+        self.attr = attackrange
+        self.attw = 0
+        self.attt = 0
+        self.attd = attackd
+        self.att = False
 
-        self.leepw = 0
-        self.leept = 0
-        self.leeptime = 60
-        self.lspd = 5
-        self.leep = False
-        self.d = pygame.math.Vector2(0, 0)
+        self.targetd = pygame.math.Vector2(0, 0)
+        self.ntg = pygame.math.Vector2(0, 0)
+        self.path = [(0,0)]
 
-    def load_sprites(self):
+    def load_sprites(self,name=""):
         self.sprites = []
         for i in range(9):
-            self.sprites.append(load_image(f"assets/anger/{i}.png", 64))
-
+            self.sprites.append(load_image(f"assets/{name}/{i}.png", 64))
     def die(self):
         self.game.frontlayer.remove(self)
         self.game.frontlayer.append(Poe(self.game, (self.rect.x+16,self.rect.y+16)))
+
+    def pathfind(self,obstacles=(Lantern,Pillar)):
+        r = self.rect.move(self.game.offset[0],self.game.offset[1])
+        self.targetd = pygame.math.Vector2(self.game.player.rect.x-r.x,self.game.player.rect.y-r.y)
+        if self.targetd.magnitude() > 0:
+            self.ntg = self.targetd.normalize()
+        if not self.att:
+            self.direction = pygame.math.Vector2(0, 0)
+
+        if self.targetd.magnitude() <= self.agro:
+            objects = []
+            for w in self.game.backlayer:
+                for r in w.trects:
+                    objects.append(r.move(self.game.offset[0]+w.pos[0],self.game.offset[1]+w.pos[1]))
+            for obj in self.game.frontlayer:
+                if isinstance(obj, obstacles):
+                    objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
+            self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
+            if not self.path: self.path = [(0,0)]
+
+            if not self.att:
+                self.direction = pygame.Vector2(self.path[0][0], self.path[0][1])
+
+    def move(self):
+        if self.direction.magnitude() > 0:
+            self.rect.x += self.direction.x * self.speed
+            self.rect.y += self.direction.y * self.speed
+            self.collrect.topleft = (self.rect.x+8,self.rect.y+34)
 
     def update(self):
         if self.hp <= 0:
@@ -265,166 +276,80 @@ class Anger(pygame.sprite.Sprite):
                 self.hit = False
                 self.hitd = 0
         self.ylayer = self.rect.y + self.game.offset[1]
-        r = self.rect.move(self.game.offset[0],self.game.offset[1])
-        targetd = pygame.math.Vector2(self.game.player.rect.x-r.x,self.game.player.rect.y-r.y)
-        if targetd.magnitude() > 0:
-            ntg = targetd.normalize()
-        if not self.leep:
-            self.direction = pygame.math.Vector2(0, 0)
+        self.pathfind()
+        self.attack()
+        self.move()
 
-        if targetd.magnitude() <= self.agro:
-            objects = []
-            for w in self.game.backlayer:
-                for r in w.trects:
-                    objects.append(r.move(self.game.offset[0]+w.pos[0],self.game.offset[1]+w.pos[1]))
-            for obj in self.game.frontlayer:
-                if isinstance(obj, Lantern):
-                    objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
-                if isinstance(obj, Pillar):
-                    objects.append(obj.collrect.move(self.game.offset[0],self.game.offset[1]))
-            self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
-            if not self.path: self.path = [(0,0)]
 
-        
-        if targetd.magnitude() <= 150 and not self.leep and abs(self.path[0][0]-ntg.x)<=0.3 and abs(self.path[0][1]-ntg.y)<=0.3:
-            self.leepw += 1
-        
-        elif targetd.magnitude() <= self.agro and not self.leep:
-            self.direction = pygame.Vector2(self.path[0][0], self.path[0][1])
+    def attack(self):
+        pass
 
-        if self.leepw >= 30:
-            self.leep = True
-            self.leept += 1
-        if self.leept == self.leeptime:
-            self.leepw = 0
-            self.leept = 0
-            self.leep = False
+    def draw(self):
+        s=self.sprites[int(self.i*self.game.animspeed)%9]
+        if self.hit and self.hitd<=10:
+            s = s.copy()
+            s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
+        self.game.screen.blit(s, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
+        if self.game.debugrect: 
+            pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
+            pygame.draw.rect(self.game.screen,(0,0,255),self.collrect.move(self.game.offset[0],self.game.offset[1]),1)
+            pygame.draw.circle(self.game.screen,(0,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]).center, self.agro, 1)
+    
+        self.i += 1
 
-        if self.leept == 1:
-            self.d = ntg
+
+class Anger(Enemy):
+    def __init__(self,game,pos):
+        super().__init__(game,pos,1,1,300,150,60)
+        self.load_sprites("anger")
+        self.speed = 1
+        self.hit = False
+        self.hitd = 0
+
+    def attack(self):
+        if self.targetd.magnitude() <= self.attr and not self.att and abs(self.path[0][0]-self.ntg.x)<=0.3 and abs(self.path[0][1]-self.ntg.y)<=0.3:
+            self.attw += 1
+
+        if self.attw >= 30:
+            self.att = True
+            self.attt += 1
+        if self.attt == self.attd:
+            self.attw = 0
+            self.attt = 0
+            self.att = False
+
+        if self.attt == 1:
+            self.d = self.ntg
             pygame.mixer.Sound("assets/sound/fire_dash.mp3").play()
 
-        if self.leept > 0:
-            self.direction = self.d*self.lspd*(15/self.leept)
+        if self.attt > 0:
+            self.direction = self.d*5*(15/self.attt)
 
-        # Normalize and apply movement
-        if self.direction.magnitude() > 0:
-            self.rect.x += self.direction.x * self.speed
-            self.rect.y += self.direction.y * self.speed
-            self.collrect.topleft = (self.rect.x+8,self.rect.y+34)  # Update collrect position
-
-        if self.leep and self.collrect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.collrect) and not self.game.player.hit:
+        if self.att and self.collrect.move(self.game.offset[0],self.game.offset[1]).colliderect(self.game.player.collrect) and not self.game.player.hit:
             self.game.player.poe -= 0.5
             self.game.player.hit = True
             self.game.offset[0] -= self.direction.x
             self.game.offset[1] -= self.direction.y
 
-
-    def draw(self):
-        s=self.sprites[int(self.i*self.game.animspeed)%9]
-        if self.hit and self.hitd<=10:
-            s = s.copy()
-            s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
-        self.game.screen.blit(s, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
-        if self.game.debugrect: 
-            pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
-            pygame.draw.rect(self.game.screen,(0,0,255),self.collrect.move(self.game.offset[0],self.game.offset[1]),1)
-            pygame.draw.circle(self.game.screen,(0,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]).center, self.agro, 1)
-    
-        self.i += 1
-
-class Lust(pygame.sprite.Sprite):
+class Lust(Enemy):
     def __init__(self,game,pos):
-        super().__init__()
-        self.game = game
-        self.rect = pygame.Rect(*pos, 64, 64)
-        self.collrect = pygame.Rect(pos[0]+8,pos[1]+34, 48, 32)
-        self.direction = pygame.math.Vector2(0, 0)
-        self.ylayer = pos[1]
-        self.load_sprites()
-        self.i = 0 #Frame index
+        super().__init__(game,pos,1,1,300,250,60)
+        self.load_sprites("lust")
         self.speed = 1
         self.hit = False
         self.hitd = 0
-        self.agro = 300
 
-        self.hp = 1
-
-        self.shw = 0
-        self.sht = 0
-        self.shtime = 20
-        self.shoot = False
-
-    def load_sprites(self):
-        self.sprites = []
-        for i in range(9):
-            self.sprites.append(load_image(f"assets/lust/{i}.png", 64))
-
-    def die(self):
-        self.game.frontlayer.remove(self)
-        self.game.frontlayer.append(Poe(self.game, (self.rect.x+16,self.rect.y+16)))
-
-    def update(self):
-        if self.hp <= 0:
-            self.die()
-        if self.hit:
-            self.hitd += 1
-            self.i=0
-            if self.hitd == 1: pygame.mixer.Sound("assets/sound/hit.mp3").play()
-            if self.hitd >= 30:
-                self.hit = False
-                self.hitd = 0
-        self.ylayer = self.rect.y + self.game.offset[1]
-        r = self.rect.move(self.game.offset[0],self.game.offset[1])
-        targetd = pygame.math.Vector2(self.game.player.rect.x-r.x,self.game.player.rect.y-r.y)
-        if targetd.magnitude() > 0:
-            ntg = targetd.normalize()
-        self.direction = pygame.math.Vector2(0,0)
-
-        if targetd.magnitude() <= self.agro:
-            objects = []
-            for w in self.game.backlayer:
-                for r in w.trects:
-                    objects.append(r.move(self.game.offset[0]+w.pos[0],self.game.offset[1]+w.pos[1]))
-            for obj in self.game.frontlayer:
-                if isinstance(obj, Lantern):
-                    objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
-                if isinstance(obj, Pillar):
-                    objects.append(obj.collrect.move(self.game.offset[0],self.game.offset[1]))
-            self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
-            if not self.path: self.path = [(0,0)]
-
-        
-        if targetd.magnitude() <= self.agro and not self.shoot:
-            self.shw += 1
+    def attack(self):
+        if self.targetd.magnitude() <= self.attr and not self.att:
+            self.attw += 1
             self.direction = pygame.Vector2(self.path[0][0], self.path[0][1])
 
-        if self.shw >= 60:
-            self.shoot = True
-            self.sht += 1
-        if self.sht == self.shtime:
-            self.shw = 0
-            self.sht = 0
-            self.shoot = False
-        if self.sht == 1:
-            Heart(self.game,(self.rect.x+32,self.rect.y+32), 5, ntg)
-
-        # Normalize and apply movement
-        if self.direction.magnitude() > 0:
-            self.rect.x += self.direction.x * self.speed
-            self.rect.y += self.direction.y * self.speed
-            self.collrect.topleft = (self.rect.x+8,self.rect.y+34)  # Update collrect position
-
-
-    def draw(self):
-        s=self.sprites[int(self.i*self.game.animspeed)%9]
-        if self.hit and self.hitd<=10:
-            s = s.copy()
-            s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
-        self.game.screen.blit(s, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
-        if self.game.debugrect: 
-            pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
-            pygame.draw.rect(self.game.screen,(0,0,255),self.collrect.move(self.game.offset[0],self.game.offset[1]),1)
-            pygame.draw.circle(self.game.screen,(0,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]).center, self.agro, 1)
-    
-        self.i += 1
+        if self.attw >= 60:
+            self.att = True
+            self.attt += 1
+        if self.attt == self.attd:
+            self.attw = 0
+            self.attt = 0
+            self.att = False
+        if self.attt == 1:
+            Heart(self.game,(self.rect.x+32,self.rect.y+32), 5, self.ntg)
