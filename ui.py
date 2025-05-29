@@ -101,16 +101,6 @@ class Dialogue:
             return False
         return True
 
-  # Still rendering text
-        self.frame_counter += 1
-        if self.frame_counter >= self.scribble_speed and self.current_index < len(self.text_blocks):
-            self.rendered_text.append(self.text_blocks[self.current_index])
-            self.current_index += 1
-            self.frame_counter = 0  # Reset the frame counter
-        if self.current_index >= len(self.text_blocks):
-            return True  # All text has been rendered
-        return False  # Still rendering text
-
     def render(self):
         self.textsurface.fill((0, 0, 0, 0))  # Clear the surface
         for block in self.text_blocks:
@@ -131,11 +121,17 @@ class DialogueBox:
         self.visible = True
 
     def drawbox(self):
-        self.box = pygame.Surface((832,192), pygame.SRCALPHA)
-        self.box.blit(load_image("assets/ui/dialogbox_corner.png",192), (0, 0))
-        self.box.blit(load_image("assets/ui/dialogbox_body.png",(448,192)), (192, 0))
-        self.box.blit(pygame.transform.flip(load_image("assets/ui/dialogbox_corner.png",192),True,False), (624, 0))
+        er = 20 #edge radius
+        bcol = (204,170,106)
+        scol = (173,147,99)
+        ecol = (138,118,83)
+        self.box = pygame.Surface((208,48), pygame.SRCALPHA)
 
+        pygame.draw.rect(self.box, bcol, (0, 0, 208, 48),0,er)
+        pygame.draw.rect(self.box, scol, (0, 0, 208, 48), 4,er)
+        pygame.draw.rect(self.box, ecol, (0, 0, 208, 48), 2,er)
+
+        self.box = pygame.transform.scale(self.box, (208*4, 48*4))
 
     def draw(self):
         if self.visible:
@@ -162,7 +158,7 @@ class Interact(pygame.sprite.Sprite):
         super().__init__()
         self.game = game
         self.rect = pygame.Rect(*pos, 64, 64)
-        self.icon = load_image(f"assets/ui/{icon}.png", 16)
+        self.icon = load_image(f"assets/ui/{icon}.png", 32)
         self.text = text
         self.font = pygame.font.Font("assets/font.ttf", 24)
         self.textsurface = self.font.render(self.text, True, (255, 255, 255))
@@ -171,13 +167,18 @@ class Interact(pygame.sprite.Sprite):
         self.visible = True
 
     def drawbox(self):
-        self.box = pygame.Surface((self.textsurface.get_width()+112, 32), pygame.SRCALPHA)
-        self.box.blit(load_image("assets/ui/interbox_corner.png",32), (0, 0))
-        self.box.blit(pygame.transform.flip(load_image("assets/ui/interbox_corner.png",32),True,False), (self.textsurface.get_width()+32, 0))
-        self.box.blit(load_image("assets/ui/interbox_body.png",(self.textsurface.get_width(),32)), (32, 0))
+        self.box = pygame.Surface((self.textsurface.get_width()/2+8, 10), pygame.SRCALPHA)
+        er = 3
+        bcol = (60,40,90)
+        ecol = (110,90,130)
 
-        self.box.blit(self.icon, (16, 8))
-        self.box.blit(self.textsurface, (48, 0))
+        pygame.draw.rect(self.box,bcol,(0,0,self.textsurface.get_width()/2,10),0,er)
+        pygame.draw.rect(self.box,ecol,(0,0,self.textsurface.get_width()/2,10),1,er)
+
+
+        self.box = pygame.transform.scale(self.box, (self.textsurface.get_width()*2+32, 40))
+        self.box.blit(self.icon,(12,4))
+        self.box.blit(self.textsurface, (52, 4))
 
         
     def draw(self):

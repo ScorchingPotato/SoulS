@@ -27,12 +27,12 @@ class Game:
 
         #Dialogue dim = (768,122)
 
-        self.uilayer = [DialogueBox(self,[Dialogue(f"Hello this is a test of the dialog system.",(768,122))])]
+        self.uilayer = [DialogueBox(self,[Dialogue(f"Test {i}",(768,122)) for i in range(3)])]
         self.projlayer = []
         self.player = Player(self, (568, 368))
 
         self.decorlayer = [Decor(self,"grass",(256,196))]
-        self.frontlayer = [self.player,Poe(self,(100,100)),Poe(self,(100,800)),Lantern(self,(600,200)),Anger(self,(400, 400)),Lust(self,(500, 500)),Pillar(self,(600, 0),3,"n"),Pillar(self,(800,0),5,'b')]
+        self.frontlayer = [self.player,Soul(self,(-500,100),"wanderer"),Poe(self,(100,100)),Poe(self,(100,800)),Lantern(self,(600,200)),Anger(self,(1400, 400)),Lust(self,(1500, 500)),Pillar(self,(600, 0),3,"n"),Pillar(self,(800,0),5,'b')]
         self.backlayer = [construct(Map.e,self,(0,0)),construct(Map.test1x1,self,(600,600))]
 
         self.rungame = True
@@ -44,6 +44,7 @@ class Game:
     def run(self):
         while self.rungame:
             self.clock.tick(60)
+            print(f"FPS: {self.clock.get_fps():.2f}", end="\r")
 
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:

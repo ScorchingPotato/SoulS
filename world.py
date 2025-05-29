@@ -140,7 +140,7 @@ class Lantern:
 
         self.lightradius = 192
         self.l = self.lightradius//2
-        self.ib = Interact(self.game, (self.rect.x-32,self.rect.y-32), "key", "Light up")
+        self.ib = Interact(self.game, (self.rect.x-32,self.rect.y-32), "key_e", "Light up")
         self.game.uilayer.append(self.ib)
 
     def load_sprites(self):

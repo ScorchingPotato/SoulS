@@ -2,7 +2,7 @@ import pygame
 from utils import *
 from ui import *
 from world import *
-import math
+import math,random
 
 class Player(pygame.sprite.Sprite):
     def __init__(self,game,pos):
@@ -123,7 +123,7 @@ class Projectile(pygame.sprite.Sprite):
             self.rect.x += self.direction.x * self.speed
             self.rect.y += self.direction.y * self.speed
 
-    def hit(self,):
+    def hit(self):
         for obj in self.game.frontlayer:
             if isinstance(obj, self.objects) and obj.collrect.colliderect(self.rect):
                 self.lifetime = self.lifemax
@@ -202,6 +202,51 @@ class Poe(pygame.sprite.Sprite):
         self.game.screen.blit(self.sprites[int(self.i*self.game.animspeed)%6], (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
         if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
         self.i += 1
+
+class Soul(pygame.sprite.Sprite):
+    def __init__(self,game,pos,name):
+        super().__init__()
+        self.game = game
+        self.rect = pygame.Rect(*pos, 64, 64)
+        self.anchor = pos
+        self.dest = pos
+        self.direction = pygame.math.Vector2(0, 0)
+        self.ylayer = pos[1]
+        self.name = name
+        self.load_sprites()
+        self.i = 0 #Frame index
+        self.speed = 1
+        self.w = 0
+
+    def load_sprites(self):
+        self.sprites = []
+        for i in range(9):
+            self.sprites.append(load_image(f"assets/{self.name}/{i}.png", 64))
+
+    def wander(self,w,m):
+        self.w += 1
+        if self.w >= w:
+            self.w = 0
+            self.dest = (self.anchor[0]+random.randint(-8,8)*8,self.anchor[1]+random.randint(-8,8)*8)
+            self.direction = pygame.math.Vector2(self.dest[0]-self.rect.x,self.dest[1]-self.rect.y)
+        if self.w==m:
+            self.direction = pygame.math.Vector2(0,0)
+        if self.direction.magnitude() > 0:
+            self.direction.normalize_ip()
+            self.rect.x += self.direction.x * self.speed
+            self.rect.y += self.direction.y * self.speed
+
+    def update(self):
+        self.ylayer = self.rect.y + self.game.offset[1]
+        self.wander(120,300)
+
+
+    def draw(self):
+        s=self.sprites[int(self.i*self.game.animspeed)%9]
+        self.game.screen.blit(s, (self.rect.x+self.game.offset[0],self.rect.y+self.game.offset[1]))
+        if self.game.debugrect: pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1);pygame.draw.circle(self.game.screen,(0,255,0),(self.anchor[0]+self.game.offset[0],self.anchor[1]+self.game.offset[1]),3)
+        self.i += 1
+
 
 
 class Enemy(pygame.sprite.Sprite):
