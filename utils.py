@@ -119,7 +119,11 @@ def load_image(path,res):
     except FileNotFoundError:
         return pygame.transform.scale(pygame.image.load("assets/error.png"),r)
     
+# Optimized pathfinding utilities - replace the pathfinding section in utils.py
+
 import heapq
+import pygame
+import math
 
 class Node:
     def __init__(self, position, g, h, parent=None):
@@ -133,65 +137,117 @@ class Node:
         return self.f < other.f
 
 def heuristic(a, b):
-    # Manhattan distance
+    # Manhattan distance for faster computation
     return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
-def pathfind(start, goal, obstacles=[]):
+def pathfind(start, goal, obstacles=[], grid_size=16, max_iterations=500):
     """
-    A* pathfinding algorithm to find the shortest path from start to goal.
-
+    Optimized A* pathfinding algorithm with grid-based movement and early termination.
+    
     Args:
         start (tuple): Starting position (x, y).
         goal (tuple): Goal position (x, y).
         obstacles (list): List of pygame.Rect objects representing obstacles.
-
+        grid_size (int): Size of each grid cell for pathfinding (larger = faster but less precise)
+        max_iterations (int): Maximum iterations before giving up
+    
     Returns:
-        list: A simplified list of (x, y) tuples representing the path.
+        list: A simplified list of (dx, dy) direction tuples representing the path.
     """
+    # Convert positions to grid coordinates
+    start_grid = (start[0] // grid_size, start[1] // grid_size)
+    goal_grid = (goal[0] // grid_size, goal[1] // grid_size)
+    
+    # Early exit if start and goal are the same
+    if start_grid == goal_grid:
+        return [(0, 0)]
+    
+    # Early exit if goal is too far (optional performance check)
+    distance = heuristic(start_grid, goal_grid)
+    if distance > 100:  # Adjust this threshold as needed
+        # Return direct path if too far
+        dx = 1 if goal[0] > start[0] else -1 if goal[0] < start[0] else 0
+        dy = 1 if goal[1] > start[1] else -1 if goal[1] < start[1] else 0
+        return [(dx, dy)]
+    
+    # Create obstacle grid for faster collision detection
+    obstacle_grid = create_obstacle_grid(obstacles, grid_size)
+    
     open_list = []
-    heapq.heappush(open_list, Node(start, g=0, h=heuristic(start, goal)))
+    heapq.heappush(open_list, Node(start_grid, g=0, h=heuristic(start_grid, goal_grid)))
     closed_set = set()
     came_from = {}
-
-    g_score = {start: 0}
-    f_score = {start: heuristic(start, goal)}
-
-    while open_list:
+    
+    g_score = {start_grid: 0}
+    iterations = 0
+    
+    # 8-directional movement (including diagonals)
+    directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+    
+    while open_list and iterations < max_iterations:
+        iterations += 1
         current = heapq.heappop(open_list).position
-
-        if current == goal:
+        
+        if current == goal_grid:
             path = reconstruct_path(came_from, current)
-            return simplify_path(path)
-
+            return simplify_path_optimized(path, start, goal, grid_size)
+        
         closed_set.add(current)
-
-        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (1, 1), (1, -1), (-1, 1)]:
+        
+        for dx, dy in directions:
             neighbor = (current[0] + dx, current[1] + dy)
-
-            if neighbor in closed_set or not valid(neighbor, obstacles):
+            
+            if neighbor in closed_set:
                 continue
-
-            tentative_g_score = g_score[current] + 1
-
+                
+            # Check if neighbor is valid using pre-computed obstacle grid
+            if not is_valid_grid_position(neighbor, obstacle_grid, grid_size):
+                continue
+            
+            # Calculate movement cost (diagonal movement costs more)
+            move_cost = 1.4 if dx != 0 and dy != 0 else 1.0
+            tentative_g_score = g_score[current] + move_cost
+            
             if neighbor not in g_score or tentative_g_score < g_score[neighbor]:
                 came_from[neighbor] = current
                 g_score[neighbor] = tentative_g_score
-                f_score[neighbor] = tentative_g_score + heuristic(neighbor, goal)
-                heapq.heappush(open_list, Node(neighbor, g=g_score[neighbor], h=heuristic(neighbor, goal)))
+                f_score = tentative_g_score + heuristic(neighbor, goal_grid)
+                heapq.heappush(open_list, Node(neighbor, g=g_score[neighbor], h=heuristic(neighbor, goal_grid)))
+    
+    # Fallback: return direct movement if no path found
+    dx = 1 if goal[0] > start[0] else -1 if goal[0] < start[0] else 0
+    dy = 1 if goal[1] > start[1] else -1 if goal[1] < start[1] else 0
+    return [(dx, dy)]
 
-    return None  # No path found
+def create_obstacle_grid(obstacles, grid_size):
+    """
+    Create a set of grid positions that contain obstacles for faster lookup.
+    """
+    obstacle_grid = set()
+    
+    for obstacle in obstacles:
+        # Get grid bounds for this obstacle
+        left = obstacle.left // grid_size
+        right = (obstacle.right - 1) // grid_size + 1
+        top = obstacle.top // grid_size
+        bottom = (obstacle.bottom - 1) // grid_size + 1
+        
+        # Mark all grid cells that intersect with this obstacle
+        for x in range(left, right):
+            for y in range(top, bottom):
+                obstacle_grid.add((x, y))
+    
+    return obstacle_grid
 
+def is_valid_grid_position(pos, obstacle_grid, grid_size):
+    """
+    Check if a grid position is valid (not blocked by obstacles).
+    """
+    return pos not in obstacle_grid
 
 def reconstruct_path(came_from, current):
     """
     Reconstruct the path from the came_from map.
-
-    Args:
-        came_from (dict): Map of nodes to their predecessors.
-        current (tuple): Current position.
-
-    Returns:
-        list: A list of (x, y) tuples representing the path.
     """
     path = [current]
     while current in came_from:
@@ -200,45 +256,63 @@ def reconstruct_path(came_from, current):
     path.reverse()
     return path
 
-
-def simplify_path(path):
+def simplify_path_optimized(path, start, goal, grid_size):
     """
-    Simplify the path by removing intermediate points on the same straight line
-    and converting it into direction tuples.
-
-    Args:
-        path (list): A list of (x, y) tuples representing the path.
-
-    Returns:
-        list: A simplified list of direction tuples (dx, dy).
+    Convert grid path to world directions and simplify.
     """
     if len(path) <= 1:
-        return []
+        # Fallback to direct movement
+        dx = 1 if goal[0] > start[0] else -1 if goal[0] < start[0] else 0
+        dy = 1 if goal[1] > start[1] else -1 if goal[1] < start[1] else 0
+        return [(dx, dy)]
+    
+    # Convert first step from grid to world direction
+    grid_dx = path[1][0] - path[0][0]
+    grid_dy = path[1][1] - path[0][1]
+    
+    # Normalize to unit direction
+    dx = max(-1, min(1, grid_dx))
+    dy = max(-1, min(1, grid_dy))
+    
+    return [(dx, dy)]
 
-    directions = []
-    for i in range(1, len(path)):
-        dx = path[i][0] - path[i - 1][0]
-        dy = path[i][1] - path[i - 1][1]
-        direction = (dx // max(1, abs(dx)), dy // max(1, abs(dy)))  # Normalize to unit direction
-        directions.append(direction)
-
-    return directions
-
-
-def valid(pos, obstacles):
+# Fast line-of-sight check for simple cases
+def has_line_of_sight(start, goal, obstacles, step_size=16):
     """
-    Check if a position is valid (not colliding with any obstacles).
-
-    Args:
-        pos (tuple): Position to check (x, y).
-        obstacles (list): List of pygame.Rect objects representing obstacles.
-
-    Returns:
-        bool: True if the position is valid, False otherwise.
+    Quick check if there's a direct line of sight between two points.
     """
-    point_rect = pygame.Rect(pos[0], pos[1], 1, 1)
-    return not any(point_rect.colliderect(obstacle) for obstacle in obstacles)
+    dx = goal[0] - start[0]
+    dy = goal[1] - start[1]
+    distance = math.sqrt(dx*dx + dy*dy)
+    
+    if distance == 0:
+        return True
+    
+    steps = int(distance // step_size) + 1
+    step_x = dx / steps
+    step_y = dy / steps
+    
+    for i in range(1, steps):
+        test_x = start[0] + step_x * i
+        test_y = start[1] + step_y * i
+        test_rect = pygame.Rect(test_x - 8, test_y - 8, 16, 16)
+        
+        for obstacle in obstacles:
+            if test_rect.colliderect(obstacle):
+                return False
+    
+    return True
 
-
-
-
+# Enhanced pathfinding function that tries line of sight first
+def smart_pathfind(start, goal, obstacles, grid_size=16):
+    """
+    Smart pathfinding that tries direct movement first, then falls back to A*.
+    """
+    # First, check if we have direct line of sight
+    if has_line_of_sight(start, goal, obstacles):
+        dx = 1 if goal[0] > start[0] else -1 if goal[0] < start[0] else 0
+        dy = 1 if goal[1] > start[1] else -1 if goal[1] < start[1] else 0
+        return [(dx, dy)]
+    
+    # Otherwise, use A* pathfinding
+    return pathfind(start, goal, obstacles, grid_size)

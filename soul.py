@@ -168,6 +168,8 @@ class Flame(Projectile):
                 self.lifetime = self.lifemax
                 obj.hp -= 0.5
                 obj.hit = True
+                obj.collrect.move_ip(self.direction*self.speed*5)
+                obj.rect.move_ip(self.direction*self.speed*5)
 
 class Heart(Projectile):
     def __init__(self,game,pos,speed,direction):
@@ -273,36 +275,91 @@ class Enemy(pygame.sprite.Sprite):
         self.targetd = pygame.math.Vector2(0, 0)
         self.ntg = pygame.math.Vector2(0, 0)
         self.path = [(0,0)]
+        
+
+        self.pathfind_timer = 0
+        self.pathfind_interval = 10  # Recalculate path every 10 frames instead of every frame
+        self.last_player_pos = None
+        self.cached_obstacles = []
+        self.obstacle_cache_timer = 0
 
     def load_sprites(self,name=""):
-        self.sprites = []
+        self.sprites = [[],[]]
         for i in range(9):
-            self.sprites.append(load_image(f"assets/{name}/{i}.png", 64))
+            self.sprites[0].append(load_image(f"assets/{name}/{i}.png", 64))
+        for i in range(5):
+            self.sprites[1].append(load_image(f"assets/{name}-charge/{i}.png",64))
+
     def die(self):
         self.game.frontlayer.remove(self)
         self.game.frontlayer.append(Poe(self.game, (self.rect.x+16,self.rect.y+16)))
 
-    def pathfind(self,obstacles=(Lantern,Pillar)):
-        r = self.rect.move(self.game.offset[0],self.game.offset[1])
-        self.targetd = pygame.math.Vector2(self.game.player.rect.x-r.x,self.game.player.rect.y-r.y)
+    def pathfind(self, obstacles=(Lantern, Pillar)):
+        r = self.rect.move(self.game.offset[0], self.game.offset[1])
+        self.targetd = pygame.math.Vector2(self.game.player.rect.x - r.x, self.game.player.rect.y - r.y)
+        
         if self.targetd.magnitude() > 0:
             self.ntg = self.targetd.normalize()
+        
         if not self.att:
             self.direction = pygame.math.Vector2(0, 0)
 
+        # Only pathfind if player is within aggro range
         if self.targetd.magnitude() <= self.agro:
-            objects = []
-            for w in self.game.backlayer:
-                for r in w.trects:
-                    objects.append(r.move(self.game.offset[0]+w.pos[0],self.game.offset[1]+w.pos[1]))
-            for obj in self.game.frontlayer:
-                if isinstance(obj, obstacles):
-                    objects.append(obj.rect.move(self.game.offset[0],self.game.offset[1]))
-            self.path = pathfind((math.floor(self.rect.x+32+self.game.offset[0]),math.floor(self.rect.y+32+self.game.offset[1])),(math.floor(self.game.player.rect.x+32),math.floor(self.game.player.rect.y+32)),objects)
-            if not self.path: self.path = [(0,0)]
-
-            if not self.att:
+            player_pos = (self.game.player.rect.x, self.game.player.rect.y)
+            
+            # Only recalculate path periodically or if player moved significantly
+            should_recalculate = (
+                self.pathfind_timer <= 0 or 
+                self.last_player_pos is None or
+                abs(player_pos[0] - self.last_player_pos[0]) > 32 or
+                abs(player_pos[1] - self.last_player_pos[1]) > 32
+            )
+            
+            if should_recalculate:
+                # Cache obstacles periodically instead of rebuilding every frame
+                if self.obstacle_cache_timer <= 0:
+                    self.cached_obstacles = []
+                    
+                    # Add world collision rectangles
+                    for w in self.game.backlayer:
+                        for rect in w.trects:
+                            self.cached_obstacles.append(rect.move(
+                                self.game.offset[0] + w.pos[0],
+                                self.game.offset[1] + w.pos[1]
+                            ))
+                    
+                    # Add object collision rectangles
+                    for obj in self.game.frontlayer:
+                        if isinstance(obj, obstacles):
+                            self.cached_obstacles.append(obj.rect.move(self.game.offset[0], self.game.offset[1]))
+                    
+                    self.obstacle_cache_timer = 30  # Refresh obstacle cache every 30 frames
+                
+                # Use optimized pathfinding
+                start_pos = (
+                    math.floor(self.rect.x + 32 + self.game.offset[0]),
+                    math.floor(self.rect.y + 32 + self.game.offset[1])
+                )
+                goal_pos = (
+                    math.floor(self.game.player.rect.x + 32),
+                    math.floor(self.game.player.rect.y + 32)
+                )
+                
+                self.path = smart_pathfind(start_pos, goal_pos, self.cached_obstacles, grid_size=32)
+                if not self.path:
+                    self.path = [(0, 0)]
+                
+                self.last_player_pos = player_pos
+                self.pathfind_timer = self.pathfind_interval
+            
+            # Set movement direction
+            if not self.att and self.path:
                 self.direction = pygame.Vector2(self.path[0][0], self.path[0][1])
+        
+        # Decrement timers
+        self.pathfind_timer -= 1
+        self.obstacle_cache_timer -= 1
 
     def move(self):
         if self.direction.magnitude() > 0:
@@ -329,8 +386,14 @@ class Enemy(pygame.sprite.Sprite):
     def attack(self):
         pass
 
+    def sprite(self):
+        if self.attw>0 and not self.att:
+            return self.sprites[1][min(int(self.attw*self.game.animspeed),4)]
+        else:
+            return self.sprites[0][int(self.i*self.game.animspeed)%9]
+
     def draw(self):
-        s=self.sprites[int(self.i*self.game.animspeed)%9]
+        s=self.sprite()
         if self.hit and self.hitd<=10:
             s = s.copy()
             s.fill((255,255,255), special_flags=pygame.BLEND_RGB_ADD)
@@ -339,7 +402,8 @@ class Enemy(pygame.sprite.Sprite):
             pygame.draw.rect(self.game.screen,(255,0,0),self.rect.move(self.game.offset[0],self.game.offset[1]),1)
             pygame.draw.rect(self.game.screen,(0,0,255),self.collrect.move(self.game.offset[0],self.game.offset[1]),1)
             pygame.draw.circle(self.game.screen,(0,255,0),self.rect.move(self.game.offset[0],self.game.offset[1]).center, self.agro, 1)
-    
+            pygame.draw.circle(self.game.screen,(0,255,100),self.rect.move(self.game.offset[0],self.game.offset[1]).center, self.attr, 1)
+
         self.i += 1
 
 
@@ -352,8 +416,14 @@ class Anger(Enemy):
         self.hitd = 0
 
     def attack(self):
-        if self.targetd.magnitude() <= self.attr and not self.att and abs(self.path[0][0]-self.ntg.x)<=0.3 and abs(self.path[0][1]-self.ntg.y)<=0.3:
-            self.attw += 1
+        if not self.att and has_line_of_sight(self.rect.center,self.game.player.rect.center,self.cached_obstacles):
+            if self.targetd.magnitude() <= self.attr:
+                self.attw += 1
+            elif self.targetd.magnitude() <= self.agro and self.attw>0 and self.attt==0:
+                self.attw += 1
+            else:
+                self.attw = 0
+
 
         if self.attw >= 30:
             self.att = True

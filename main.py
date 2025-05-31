@@ -32,7 +32,7 @@ class Game:
         self.player = Player(self, (568, 368))
 
         self.decorlayer = [Decor(self,"grass",(256,196))]
-        self.frontlayer = [self.player,Soul(self,(-500,100),"wanderer"),Poe(self,(100,100)),Poe(self,(100,800)),Lantern(self,(600,200)),Anger(self,(1400, 400)),Lust(self,(1500, 500)),Pillar(self,(600, 0),3,"n"),Pillar(self,(800,0),5,'b')]
+        self.frontlayer = [self.player,Soul(self,(-500,100),"wanderer"),Poe(self,(100,100)),Poe(self,(100,800)),Lantern(self,(600,200)),Lust(self,(-1000,500)),Anger(self,(1400, 400)),Pillar(self,(600, 0),3,"n"),Pillar(self,(800,0),5,'b')]
         self.backlayer = [construct(Map.e,self,(0,0)),construct(Map.test1x1,self,(600,600))]
 
         self.rungame = True
